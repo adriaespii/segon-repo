@@ -413,7 +413,7 @@ def draw_menu(surface):
     c_txt = small_font.render(f"GOLD: {TOTAL_COINS}", True, GOLD)
     surface.blit(c_txt, (20, bar_y + 8))
     
-    ver = small_font.render("v2.3 (Story Update)", True, GRAY)
+    ver = small_font.render("v2.4 (Multiplayer Update)", True, GRAY)
     surface.blit(ver, (SCREEN_WIDTH - 180, bar_y + 8))
 
 def draw_shop(surface):
