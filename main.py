@@ -927,86 +927,139 @@ while running:
 
     elif game_state == "MP_MENU":
         screen.fill((20, 10, 30))
-        title = font.render("MULTIPLAYER (LAN)", True, CYAN)
-        screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 50))
+        title = font.render("MULTIPLAYER LOBBY", True, CYAN)
+        screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 30))
         
-        # 1. Interface Selection
-        if not is_host and net.connection_status == "IDLE":
-             lbl = small_font.render("Select Network Interface:", True, WHITE)
-             screen.blit(lbl, (SCREEN_WIDTH//2 - 200, 110))
+        # Start Discovery if not started
+        if not net.discovery.running:
+            net.start_discovery()
+            
+        # --- LEFT PANEL: DISCOVERED PLAYERS ---
+        panel_rect = pygame.Rect(50, 100, 400, 400)
+        pygame.draw.rect(screen, (30, 30, 40), panel_rect, border_radius=10)
+        pygame.draw.rect(screen, (100, 100, 150), panel_rect, 2, border_radius=10)
+        
+        lbl = small_font.render("Players on Network:", True, GRAY)
+        screen.blit(lbl, (60, 110))
+        
+        peers = net.discovery.get_peers()
+        mouse_pos = pygame.mouse.get_pos()
+        click = pygame.mouse.get_pressed()[0]
+        
+        y_off = 150
+        if not peers:
+             txt = small_font.render("Scanning...", True, (100, 100, 100))
+             screen.blit(txt, (60, 150))
              
-             # Draw dropdown-like list
-             start_y_iface = 140
-             if hasattr(sys.modules[__name__], 'mp_interfaces'):
-                 for i, (name, ip) in enumerate(mp_interfaces):
-                     col = (100, 200, 100) if i == mp_selected_interface_idx else (100, 100, 100)
-                     txt = f"{name}: {ip}"
-                     r = small_font.render(txt, True, col)
-                     rect = r.get_rect(center=(SCREEN_WIDTH//2, start_y_iface + i * 25))
-                     screen.blit(r, rect)
-                     
-                     # Simple mouse selection
-                     if rect.collidepoint(pygame.mouse.get_pos()) and pygame.mouse.get_pressed()[0]:
-                         mp_selected_interface_idx = i
-                         
-             # HOST BUTTON
-             host_btn = pygame.Rect(SCREEN_WIDTH//2 - 120, 300, 240, 50)
-             col = (50, 100, 50) if not host_btn.collidepoint(pygame.mouse.get_pos()) else (80, 150, 80)
-             pygame.draw.rect(screen, col, host_btn, border_radius=8)
-             pygame.draw.rect(screen, WHITE, host_btn, 2, border_radius=8)
-             ht = shop_font.render("HOST GAME", True, WHITE)
-             screen.blit(ht, ht.get_rect(center=host_btn.center))
-             
-             if host_btn.collidepoint(pygame.mouse.get_pos()) and pygame.mouse.get_pressed()[0]:
-                 # Start Hosting on selected IP
-                 chosen_ip = mp_interfaces[mp_selected_interface_idx][1]
-                 mp_status_msg = f"Hosting on {chosen_ip}..."
-                 net.start_host_nonblocking(bind_ip=chosen_ip)
+        for ip, data in peers.items():
+            p_rect = pygame.Rect(60, y_off, 380, 40)
+            col = (50, 50, 60)
+            if p_rect.collidepoint(mouse_pos):
+                col = (70, 70, 90)
+                if click and net.connection_status == "IDLE":
+                    # SEND INVITE
+                    mp_status_msg = f"Inviting {data['name']}..."
+                    net.send_invite(ip, "WizardPlayer") # TODO: Custom Name
+                    pygame.time.wait(200)
+
+            pygame.draw.rect(screen, col, p_rect, border_radius=5)
+            name_t = small_font.render(f"{data['name']} ({ip})", True, WHITE)
+            screen.blit(name_t, (70, y_off + 10))
+            
+            # Invite Icon/Text
+            inv_t = small_font.render("INVITE", True, GREEN)
+            screen.blit(inv_t, (350, y_off + 10))
+            
+            y_off += 50
+
+        # --- RIGHT PANEL: STATUS & MANUAL ---
+        stat_lbl = small_font.render("Status:", True, GRAY)
+        screen.blit(stat_lbl, (500, 110))
+        
+        st_col = YELLOW
+        if net.connection_status == "CONNECTED": st_col = GREEN
+        elif net.connection_status == "FAILED": st_col = RED
+        elif net.connection_status == "INVITING": st_col = CYAN
+        
+        st_t = shop_font.render(net.connection_status, True, st_col)
+        screen.blit(st_t, (500, 140))
+        
+        msg_t = small_font.render(mp_status_msg, True, WHITE)
+        screen.blit(msg_t, (500, 180))
+
+        # Manual IP Invite (Fallback)
+        lbl_m = small_font.render("Manual IP Invite:", True, GRAY)
+        screen.blit(lbl_m, (500, 250))
+        
+        ip_box = pygame.Rect(500, 280, 240, 40)
+        pygame.draw.rect(screen, (20, 20, 30), ip_box)
+        pygame.draw.rect(screen, (80, 80, 100), ip_box, 2)
+        ip_s = shop_font.render(mp_input_ip, True, WHITE)
+        screen.blit(ip_s, (510, 285))
+        
+        btn_inv = pygame.Rect(750, 280, 100, 40)
+        col_btn = (50, 80, 50) if not btn_inv.collidepoint(mouse_pos) else (80, 120, 80)
+        pygame.draw.rect(screen, col_btn, btn_inv, border_radius=5)
+        btn_t = small_font.render("INVITE", True, WHITE)
+        screen.blit(btn_t, (765, 288))
+        
+        if btn_inv.collidepoint(mouse_pos) and click and net.connection_status == "IDLE":
+             if mp_input_ip:
+                 mp_status_msg = f"Inviting {mp_input_ip}..."
+                 net.send_invite(mp_input_ip, "WizardPlayer")
                  pygame.time.wait(200)
 
-             # IP INPUT BOX (Text Field)
-             ip_label = small_font.render("Enter Server IP:", True, (200, 200, 255))
-             screen.blit(ip_label, (SCREEN_WIDTH//2 - 120, 365))
-             
-             ip_box = pygame.Rect(SCREEN_WIDTH//2 - 120, 390, 240, 40)
-             pygame.draw.rect(screen, (30, 30, 50), ip_box)
-             pygame.draw.rect(screen, (100, 100, 200), ip_box, 2)
-             
-             ip_txt = shop_font.render(mp_input_ip, True, WHITE)
-             screen.blit(ip_txt, (ip_box.x + 10, ip_box.y + 5))
-             
-             # JOIN BUTTON
-             join_btn = pygame.Rect(SCREEN_WIDTH//2 - 120, 440, 240, 50)
-             col = (50, 50, 100) if not join_btn.collidepoint(pygame.mouse.get_pos()) else (80, 80, 150)
-             pygame.draw.rect(screen, col, join_btn, border_radius=8)
-             pygame.draw.rect(screen, WHITE, join_btn, 2, border_radius=8)
-             jt = shop_font.render("JOIN GAME", True, WHITE)
-             screen.blit(jt, jt.get_rect(center=join_btn.center))
-             
-             click = pygame.mouse.get_pressed()[0]
-             
-             if (join_btn.collidepoint(pygame.mouse.get_pos()) and click) or (pygame.key.get_pressed()[pygame.K_RETURN]):
-                 # Attempt to join mp_input_ip
-                 if mp_input_ip:
-                     mp_status_msg = f"Connecting to {mp_input_ip}..."
-                     try:
-                        with open("server_ip.txt", "w") as f:
-                            f.write(mp_input_ip)
-                     except: pass
-                     
-                     net.connect_to_host(mp_input_ip)
-                     pygame.time.wait(300)
+        # --- INCOMING INVITE POPUP ---
+        if net.incoming_invite:
+            # Draw Modal Overlay
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 180))
+            screen.blit(overlay, (0,0))
+            
+            w, h = 500, 250
+            cx, cy = SCREEN_WIDTH//2, SCREEN_HEIGHT//2
+            rect = pygame.Rect(cx - w//2, cy - h//2, w, h)
+            pygame.draw.rect(screen, (40, 40, 50), rect, border_radius=15)
+            pygame.draw.rect(screen, GOLD, rect, 3, border_radius=15)
+            
+            title_inv = shop_font.render("GAME INVITATION", True, GOLD)
+            screen.blit(title_inv, title_inv.get_rect(center=(cx, cy - 80)))
+            
+            from_t = font.render(f"From: {net.incoming_invite['name']}", True, WHITE)
+            ip_t = small_font.render(f"({net.incoming_invite['ip']})", True, GRAY)
+            screen.blit(from_t, from_t.get_rect(center=(cx, cy - 20)))
+            screen.blit(ip_t, ip_t.get_rect(center=(cx, cy + 20)))
+            
+            # Yes / No Buttons
+            btn_yes = pygame.Rect(cx - 150, cy + 60, 120, 50)
+            btn_no = pygame.Rect(cx + 30, cy + 60, 120, 50)
+            
+            col_y = (0, 100, 0) if not btn_yes.collidepoint(mouse_pos) else (0, 150, 0)
+            col_n = (100, 0, 0) if not btn_no.collidepoint(mouse_pos) else (150, 0, 0)
+            
+            pygame.draw.rect(screen, col_y, btn_yes, border_radius=8)
+            pygame.draw.rect(screen, col_n, btn_no, border_radius=8)
+            
+            ty = shop_font.render("ACCEPT", True, WHITE)
+            tn = shop_font.render("DECLINE", True, WHITE)
+            screen.blit(ty, ty.get_rect(center=btn_yes.center))
+            screen.blit(tn, tn.get_rect(center=btn_no.center))
+            
+            if click:
+                if btn_yes.collidepoint(mouse_pos):
+                    net.accept_invite()
+                elif btn_no.collidepoint(mouse_pos):
+                    net.decline_invite()
 
-             # BACK BUTTON
-             back_btn = pygame.Rect(SCREEN_WIDTH//2 - 120, 520, 240, 50)
-             pygame.draw.rect(screen, (70, 50, 50), back_btn, border_radius=8)
-             pygame.draw.rect(screen, WHITE, back_btn, 2, border_radius=8)
-             bt = shop_font.render("BACK", True, WHITE)
-             screen.blit(bt, bt.get_rect(center=back_btn.center))
+        # BACK BUTTON
+        back_btn = pygame.Rect(50, 520, 150, 40)
+        pygame.draw.rect(screen, (70, 50, 50), back_btn, border_radius=8)
+        bt = small_font.render("BACK", True, WHITE)
+        screen.blit(bt, bt.get_rect(center=back_btn.center))
              
-             if back_btn.collidepoint(pygame.mouse.get_pos()) and pygame.mouse.get_pressed()[0]:
-                 game_state = "MENU"
-                 net.close()
+        if back_btn.collidepoint(mouse_pos) and click:
+            game_state = "MENU"
+            net.stop()
         
         # STATUS DISPLAY & LOGIC
         status_col = YELLOW
