@@ -20,9 +20,9 @@ Un *Roguelike* de Plataformas trepidante donde cada decisión cuenta.
 
 ⬇️ **¡JUEGA AHORA (SIN INSTALACIÓN)!** ⬇️
 
-[![DOWNLOAD GAME](https://img.shields.io/badge/📥_DESCARGAR_JUEGO-WINDOWS_(.EXE)-2ea44f?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/jordi1203/wizard-vs-ogres/raw/master/WizardVsOgres_ULTIMATE_v2.4.exe)
+[![DOWNLOAD GAME](https://img.shields.io/badge/📥_DESCARGAR_JUEGO-WINDOWS_(.EXE)-2ea44f?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/adriaespii/segon-repo/raw/master/WizardVsOgres.exe)
 
-*(Clic en el botón para descargar WizardVsOgres_ULTIMATE_v2.4.exe - Solo descárgalo y juega)*
+*(Clic en el botón para descargar WizardVsOgres.exe - Solo descárgalo y juega)*
 
 </div>
 
@@ -86,11 +86,11 @@ python main.py
  
 > "¡Juega con amigos en tu red local!"
  
-- **Nuevo Modo Multijugador (LAN)**: Conéctate con amigos en la misma red Wi-Fi o Ethernet.
-- **Selector de Tarjeta de Red**: Elige fácilmente qué conexión usar si tienes varias (Wi-Fi, Cable, VPN).
-- **Corrección de Errores**: Mejor estabilidad en el menú y red.
-- **Nuevo Sistema de Biomas**: Fondos animados con paralaje y efectos atmosféricos.
-- **Arsenal Arcano**: Nuevos hechizos visualmente impactantes.
+- **Nuevo Modo Multijugador (LAN)**: Conéctate con amigos en la misma red Wi-Fi.
+- **Modos CO-OP y PVP 1vs1**: Elige luchar juntos contra oleadas o enfrentarte a tu amigo en un duelo mortal.
+- **Seleccion de Clases**: Elige entre 4 Magos Únicos (Fuego, Hielo, Vacío, Tormenta) cada uno con su arma inicial.
+- **Recompensas PVP**: ¡Gana 100 monedas al derrotar a tu rival!
+- **Corrección de Errores**: Boss bar arreglada y sincronización mejorada.
 
 ---
 

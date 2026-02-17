@@ -6,12 +6,13 @@ from src.config import *
 from src.assets import *
 
 class Wizard(pygame.sprite.Sprite):
-    def __init__(self, x, y):
+    def __init__(self, x, y, color=(0, 255, 255)): # Default Cyan
         super().__init__()
         self.image = pygame.Surface((PLAYER_SIZE, PLAYER_SIZE), pygame.SRCALPHA)
         self.image.fill((0, 0, 0, 0)) # Transparent
         self.rect = self.image.get_rect()
         self.rect.midbottom = (x, y)
+        self.color = color
         self.vel_y = 0
         self.vel_x = 0
         self.facing_right = True
@@ -41,7 +42,19 @@ class Wizard(pygame.sprite.Sprite):
         }
         self.unlocked_weapons = ["DEFAULT"] # "ARCANE_VOLLEY", "VOID_LANCE", "FIRE_RING"
         self.current_weapon_index = 0
-        self.current_weapon = "DEFAULT"
+        
+        # Initialize Weapon based on Color (Class)
+        if self.color == (255, 0, 0): # Red -> Fire
+            self.current_weapon = "FIRE_RING"
+            self.unlocked_weapons.append("FIRE_RING")
+        elif self.color == (128, 0, 128): # Purple -> Void
+             self.current_weapon = "VOID_LANCE"
+             self.unlocked_weapons.append("VOID_LANCE")
+        elif self.color == (0, 0, 255): # Blue -> Arcane
+             self.current_weapon = "ARCANE_VOLLEY"
+             self.unlocked_weapons.append("ARCANE_VOLLEY")
+        else:
+            self.current_weapon = "DEFAULT"
 
     def update(self, keys, platforms):
         # Movement
@@ -101,8 +114,9 @@ class Wizard(pygame.sprite.Sprite):
                 self.is_casting = False
 
     def draw(self, surface):
-        color = WAND_COLORS[min(self.wand_level, len(WAND_COLORS)-1)]
-        draw_wizard(surface, self.rect.centerx, self.rect.bottom, self.facing_right, self.is_casting, color)
+        # Use self.color for robe/hat. WAND_COLORS is for projectiles?
+        # Actually draw_wizard takes a 'color' which usually tints the robe.
+        draw_wizard(surface, self.rect.centerx, self.rect.bottom, self.facing_right, self.is_casting, self.color)
 
     def select_weapon(self, slot_index):
         # 1-based index (1, 2, 3...) passed from input

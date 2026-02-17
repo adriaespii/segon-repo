@@ -23,7 +23,7 @@ card_font = pygame.font.SysFont("Arial", 20, bold=True)
 shop_font = pygame.font.SysFont("Arial", 28, bold=True)
 
 # Game State
-# MENU, PLAYING, SHOP, CARD_SELECT, GAME_OVER, VICTORY
+# MENU, PLAYING, SHOP, CARD_SELECT, GAME_OVER, VICTORY, MP_MENU, BOSS_INTRO, MP_CLASS_SELECT
 game_state = "MENU"
 # GAME_MODE: "STORY" or "INFINITE"
 GAME_MODE = "STORY" 
@@ -72,6 +72,16 @@ SHOP_UPGRADES_STATE = {} # Key: ID, Value: Level
 shop_scroll_y = 0
 shop_return_target = "MENU" # Tracks where to go after closing shop
 gray = (100, 100, 100) # Defined gray here used in draw_shop
+
+WIZARD_CLASSES = [
+    {"id": "FIRE", "name": "Pyromancer", "color": (255, 50, 0), "desc": "Master of Fire. Starts with Fire Ring."},
+    {"id": "ICE", "name": "Frost Mage", "color": (0, 200, 255), "desc": "Freezing cold. Starts with Arcane Volley."},
+    {"id": "VOID", "name": "Void Walker", "color": (120, 0, 200), "desc": "Dark energy. Starts with Void Lance."},
+    {"id": "STORM", "name": "Stormcaller", "color": (255, 255, 0), "desc": "Lightning speed. Starts with Wand."}
+]
+mp_my_class_idx = 0
+mp_remote_class_idx = -1 # -1 means not ready
+mp_class_confirmed = False
 
 # Multiplayer Globals
 net = Network()
@@ -893,6 +903,8 @@ while running:
             mp_selected_interface_idx = 0
             mp_status_msg = "Select Network Interface"
             game_state = "MP_MENU"
+            mp_class_confirmed = False
+            mp_remote_class_idx = -1
             
         # 3: SHOP
         rect_shop = pygame.Rect(ui_center_x - btn_w//2, start_y + 3*(btn_h + spacing), btn_w, btn_h)
@@ -998,6 +1010,9 @@ while running:
                 if click and net.connection_status == "IDLE":
                     # SEND INVITE
                     mp_status_msg = f"Inviting {data['name']}..."
+                    # Reset class state
+                    mp_class_confirmed = False
+                    mp_remote_class_idx = -1
                     net.send_invite(ip, "WizardPlayer", mp_game_mode) # TODO: Custom Name
                     pygame.time.wait(200)
 
@@ -1145,7 +1160,141 @@ while running:
             pygame.time.wait(1000)
             is_multiplayer = True
             is_host = net.is_host
+            
+            # Go to Class Select instead of straight to game
+            game_state = "MP_CLASS_SELECT"
+            mp_class_confirmed = False
+            mp_remote_class_idx = -1
+            
+    elif game_state == "MP_CLASS_SELECT":
+        screen.fill((20, 10, 30))
+        t = font.render("CHOOSE YOUR WIZARD", True, WHITE)
+        screen.blit(t, t.get_rect(center=(SCREEN_WIDTH//2, 50)))
+        
+        # Display Classes
+        start_x = (SCREEN_WIDTH - (4 * 220)) // 2
+        y = 150
+        
+        mouse_pos = pygame.mouse.get_pos()
+        click = False
+        for e in events:
+            if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+                click = True
+        
+        for i, cls in enumerate(WIZARD_CLASSES):
+            r = pygame.Rect(start_x + i * 230, y, 200, 300)
+            
+            # Highlight Selection
+            if i == mp_my_class_idx:
+                border_col = WHITE
+                border_w = 4
+                bg_col = (60, 60, 80)
+            else:
+                border_col = (100, 100, 100)
+                border_w = 1
+                bg_col = (30, 30, 40)
+                
+            if r.collidepoint(mouse_pos):
+                 bg_col = (50, 50, 60)
+                 if click and not mp_class_confirmed:
+                     mp_my_class_idx = i
+            
+            pygame.draw.rect(screen, bg_col, r, border_radius=10)
+            pygame.draw.rect(screen, border_col, r, border_w, border_radius=10)
+            
+            # Class Visual
+            # Draw a mini wizard
+            draw_wizard(screen, r.centerx, r.centery - 20, True, False, cls["color"])
+            
+            # Info
+            nm = shop_font.render(cls["name"], True, cls["color"])
+            screen.blit(nm, nm.get_rect(center=(r.centerx, r.centery + 60)))
+            
+            # Wrapped Desc (Simple hack)
+            desc_words = cls["desc"].split(" ")
+            dy = r.centery + 90
+            line = ""
+            for word in desc_words:
+                test_line = line + word + " "
+                if small_font.size(test_line)[0] < 180:
+                    line = test_line
+                else:
+                    s = small_font.render(line, True, GRAY)
+                    screen.blit(s, s.get_rect(center=(r.centerx, dy)))
+                    dy += 20
+                    line = word + " "
+            if line:
+                s = small_font.render(line, True, GRAY)
+                screen.blit(s, s.get_rect(center=(r.centerx, dy)))
+                
+        # Confirm Button
+        btn_confirm = pygame.Rect(SCREEN_WIDTH//2 - 100, 500, 200, 50)
+        c_col = GREEN if mp_class_confirmed else (100, 100, 100)
+        pygame.draw.rect(screen, c_col, btn_confirm, border_radius=5)
+        
+        txt_c = "WAITING..." if mp_class_confirmed else "READY"
+        ct = font.render(txt_c, True, WHITE)
+        screen.blit(ct, ct.get_rect(center=btn_confirm.center))
+        
+        if btn_confirm.collidepoint(mouse_pos) and click and not mp_class_confirmed:
+            mp_class_confirmed = True
+            # Send Selection
+            net.send({'cmd': 'CLASS_SELECT', 'idx': mp_my_class_idx})
+            
+        # Network Logic for Class Select
+        data = net.receive()
+        if data and isinstance(data, dict):
+            if data.get('cmd') == 'CLASS_SELECT':
+                mp_remote_class_idx = data.get('idx')
+            if data.get('cmd') == 'START_GAME':
+                # Host says start
+                game_state = "PLAYING"
+                reset_run(mode="INFINITE") # Reset maps etc
+                
+                # Apply Colors
+                my_c = WIZARD_CLASSES[mp_my_class_idx]["color"]
+                remote_c = WIZARD_CLASSES[mp_remote_class_idx]["color"]
+                
+                # Re-init Wizards with colors
+                # P1 is always local in 'wizard', P2 is remote in 'remote_wizard'
+                # BUT wait, Host (P1) vs Client (P1)
+                # In reset_run, we default create Wizard.
+                # We need to override it here.
+                wizard = Wizard(100, SCREEN_HEIGHT - 50, my_c)
+                all_sprites.empty()
+                projectiles.empty()
+                enemies.empty()
+                all_sprites.add(wizard)
+                
+                remote_wizard = Wizard(100, SCREEN_HEIGHT - 50, remote_c)
+                remote_wizard.rect.x = 200 # Spawn slightly apart
+                all_sprites.add(remote_wizard)
+        
+        # Check if both ready (Host side logic)
+        if is_host and mp_class_confirmed and mp_remote_class_idx != -1:
+            # Start Game
+            net.send({'cmd': 'START_GAME'})
+            game_state = "PLAYING"
             reset_run(mode="INFINITE")
+            
+            my_c = WIZARD_CLASSES[mp_my_class_idx]["color"]
+            remote_c = WIZARD_CLASSES[mp_remote_class_idx]["color"]
+            
+            wizard = Wizard(100, SCREEN_HEIGHT - 50, my_c)
+            all_sprites.empty()
+            projectiles.empty()
+            enemies.empty()
+            all_sprites.add(wizard)
+            
+            remote_wizard = Wizard(100, SCREEN_HEIGHT - 50, remote_c)
+            remote_wizard.rect.x = 200
+            all_sprites.add(remote_wizard)
+            
+            # In PvP move them to corners
+            if mp_game_mode == "PVP":
+                 wizard.rect.left = 100
+                 remote_wizard.rect.right = SCREEN_WIDTH - 100
+                 remote_wizard.facing_right = False
 
     elif game_state == "SHOP":
         # Handle Scroll
@@ -1413,6 +1562,16 @@ while running:
             # Check Game Over
             if wizard.health <= 0:
                 game_state = "GAME_OVER"
+                # If PvP, Remote Wizard Wins
+                
+            if is_multiplayer and mp_game_mode == "PVP":
+                if wizard.health <= 0:
+                     game_state = "GAME_OVER"
+                     # Lost PvP
+                elif remote_wizard and remote_wizard.health <= 0:
+                     game_state = "VICTORY"
+                     TOTAL_COINS += 100 # Reward for winning PvP
+                     save_data()
             
             # Wave Logic... (Keep same)
             
@@ -1724,8 +1883,19 @@ while running:
         txt = "VICTORY!" if game_state == "VICTORY" else "GAME OVER"
         col = GREEN if game_state == "VICTORY" else RED
         
+        # Customize for PvP
+        if is_multiplayer and mp_game_mode == "PVP":
+             if game_state == "VICTORY":
+                 txt = "YOU WIN!"
+                 sub_txt = f"Bonus: +100 Coins (Total: {TOTAL_COINS})"
+             else:
+                 txt = "YOU LOSE!"
+                 sub_txt = f"Total Coins: {TOTAL_COINS}"
+        else:
+             sub_txt = f"Final Score: {score} - Coins Earned: {TOTAL_COINS}"
+        
         t = font.render(txt, True, col)
-        s = small_font.render(f"Final Score: {score} - Coins Earned: {TOTAL_COINS}", True, WHITE)
+        s = small_font.render(sub_txt, True, WHITE)
         r = small_font.render("Press [ESC] to Return Menu", True, GRAY)
         
         cx, cy = SCREEN_WIDTH//2, SCREEN_HEIGHT//2
