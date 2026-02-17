@@ -1,16 +1,16 @@
 <div align="center">
 
 # 🧙‍♂️ WIZARD vs OGRES 👹
-### *Ultimate Edition v2.4 (Multiplayer Update)*
+### *Ultimate Edition v2.5 (PvP Balance Update)*
 
 [![Python](https://img.shields.io/badge/Python-3.13+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Pygame](https://img.shields.io/badge/Made%20with-Pygame-333333?style=for-the-badge&logo=pygame&logoColor=white)](https://www.pygame.org/)
-[![Version](https://img.shields.io/badge/Version-2.4-FF4500?style=for-the-badge)](https://github.com/jordi1203/wizard-vs-ogres/releases)
+[![Version](https://img.shields.io/badge/Version-2.5-FF4500?style=for-the-badge)](https://github.com/jordi1203/wizard-vs-ogres/releases)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)]()
 
 <br/>
 
-[![Logo](assets/logo.png)](https://github.com/jordi1203/wizard-vs-ogres/raw/last/WizardVsOgres_ULTIMATE_v2.4.exe)
+[![Logo](assets/logo.png)](https://github.com/adriaespii/segon-repo/raw/master/WizardVsOgres.exe)
 
 <br/>
 
@@ -50,6 +50,7 @@ Un *Roguelike* de Plataformas trepidante donde cada decisión cuenta.
 | **Disparar** | `Clic Izquierdo` | `Espacio` |
 | **Cambiar Arma** | `1`, `2`, `3`, `4` | Rueda del Ratón |
 | **Tienda** | `S` | (En Menú de Pausa) |
+| **Curarse (30% HP)** | `H` | - |
 | **Menú / Pausa** | `ESC` | - |
 
 </div>
@@ -82,15 +83,16 @@ python main.py
 
 ---
 
-## 🔮 NOVEDADES v2.4 (Multiplayer Update)
+## 🔮 NOVEDADES v2.5 (PvP Balance Update)
  
-> "¡Juega con amigos en tu red local!"
+> "¡Combates PvP más largos y estratégicos!"
  
 - **Nuevo Modo Multijugador (LAN)**: Conéctate con amigos en la misma red Wi-Fi.
 - **Modos CO-OP y PVP 1vs1**: Elige luchar juntos contra oleadas o enfrentarte a tu amigo en un duelo mortal.
 - **Seleccion de Clases**: Elige entre 4 Magos Únicos (Fuego, Hielo, Vacío, Tormenta) cada uno con su arma inicial.
-- **Recompensas PVP**: ¡Gana 100 monedas al derrotar a tu rival!
-- **Corrección de Errores**: Boss bar arreglada y sincronización mejorada.
+- **Reequilibrio PvP**: Vida aumentada a **1000 HP** para combates más duraderos.
+- **Nueva Habilidad**: Pulsa `H` para curarte un 30% de vida (ideal para sobrevivir).
+- **Correcciones Críticas**: Arreglado el daño propio y la visibilidad de los tornados online.
 
 ---
 
