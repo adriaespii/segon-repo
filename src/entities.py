@@ -187,23 +187,56 @@ class Wizard(pygame.sprite.Sprite):
             damage = BASE_WAND_DAMAGE * self.damage_multiplier
             color = WAND_COLORS[min(self.wand_level, len(WAND_COLORS)-1)]
             
+            # Determine Basic Attack Type based on Class Color
+            p_type = "DEFAULT"
+            p_speed = PROJECTILE_SPEED
+            p_dmg = BASE_WAND_DAMAGE
+            p_col = self.color
+            
+            if self.color == (255, 50, 0): # Fire (Red)
+                p_type = "FIRE_BOLT"
+                p_dmg = 30
+                p_speed = 12
+            elif self.color == (0, 200, 255): # Ice (Blue)
+                p_type = "ICE_SHARD"
+                p_dmg = 15
+                p_speed = 12
+            elif self.color == (120, 0, 200): # Void (Purple)
+                p_type = "VOID_ORB"
+                p_dmg = 25
+                p_speed = 8
+            elif self.color == (255, 255, 0): # Storm (Yellow)
+                p_type = "LIGHTNING_BOLT"
+                p_dmg = 10
+                p_speed = 20
+                
             # Common Projectile Velocity function
-            def create_proj(speed, angle, p_type, col):
+            def create_proj(speed, angle, p_type, col, dmg):
                 p = Projectile(start_x, start_y_base, 1 if math.cos(angle)>0 else -1, col, p_type, owner_id=self.owner_id)
                 p.vel_x = math.cos(angle) * speed
                 p.vel_y = math.sin(angle) * speed
+                p.damage = dmg # Set custom damage
+                if p_type == "VOID_ORB": p.piercing = 999
                 return p
 
             if self.current_weapon == "DEFAULT":
-                # Standard Wand logic
-                scale_factor = 1.0 + (self.multishot - 1) * 0.3
-                p = create_proj(PROJECTILE_SPEED, aim_angle, "DEFAULT", color)
-                multishot_dmg_mult = 1.0 + (self.multishot - 1) * 0.4
-                p.damage = damage * multishot_dmg_mult
-                p.scale = scale_factor
-                p.piercing = self.piercing
-                projectiles.append(p)
-                projectiles.append(p)
+                # Standard Wand logic -> Class Specific
+                # scale_factor = 1.0 + (self.multishot - 1) * 0.3 # Ignore multishot scale for now or apply to dmg
+                
+                # Apply Multishot stat as actual multiple projectiles
+                actual_multishot = max(1, self.multishot)
+                
+                # Base angle is aim_angle
+                for i in range(actual_multishot):
+                    spread = 0
+                    if actual_multishot > 1:
+                        spread = (i - (actual_multishot-1)/2) * 0.2
+                    
+                    p = create_proj(p_speed, aim_angle + spread, p_type, p_col, p_dmg)
+                    # Apply damage multiplier
+                    p.damage = p_dmg * self.damage_multiplier
+                    p.piercing = self.piercing
+                    projectiles.append(p)
 
             elif self.current_weapon == "ARCANE_VOLLEY":
                 # Fires spread of orb-like projectiles (Purple/Cyan mix)

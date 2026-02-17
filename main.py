@@ -1391,9 +1391,14 @@ while running:
                         } if remote_wizard else None,
                         'enemies': [{'x': e.rect.x, 'y': e.rect.y, 'type': e.enemy_type} for e in enemies],
                         'projs': [{'x': p.rect.x, 'y': p.rect.y, 'c': p.color, 't': p.type} for p in projectiles],
-                        'effects': active_effects # serialized active effects
+                        'effects': active_effects, # serialized active effects
+                        'game_state': game_state # Send current game state (PLAYING, GAME_OVER, VICTORY)
                     }
                     net.send(state)
+                    
+                    # If game ended, wait a bit to ensure client gets it?
+                    if game_state in ["GAME_OVER", "VICTORY"]:
+                        pygame.time.wait(100) # Give 100ms for send to flush
                     
                 except Exception as e:
                     pass
@@ -1408,6 +1413,30 @@ while running:
                 # 2. Receive World State
                 state = net.receive()
                 if state:
+                    # Sync Game State (Win/Loss)
+                    if 'game_state' in state:
+                        remote_state = state['game_state']
+                        if remote_state in ["GAME_OVER", "VICTORY"]:
+                            # Host decided game is over
+                            # If PvP, invert result for client if needed?
+                            # Host says "VICTORY" -> Host won. Client should see "GAME_OVER"?
+                            # Host says "GAME_OVER" -> Host died. Client should see "VICTORY"?
+                            
+                            # However, the logic below (lines 1612) sets game_state based on health logic.
+                            # Standard Sync:
+                            if mp_game_mode == "PVP":
+                                if remote_state == "VICTORY": game_state = "GAME_OVER"
+                                elif remote_state == "GAME_OVER": 
+                                    game_state = "VICTORY"
+                                    # Ensure we get coins only once?
+                                    # Logic handles it below? No, we jump out of loop.
+                                    # Apply reward here if not done
+                                    # ... simple hack: let local logic decide?
+                                    # Local logic might not have run if update skipped.
+                                    pass
+                            else:
+                                game_state = remote_state
+                                
                     if state.get('p2'):
                         wizard.rect.x = state['p2']['x']
                         wizard.rect.y = state['p2']['y']
@@ -1612,7 +1641,28 @@ while running:
                 elif remote_wizard and remote_wizard.health <= 0:
                      game_state = "VICTORY"
                      TOTAL_COINS += 100 # Reward for winning PvP
+                     game_state = "VICTORY"
+                     TOTAL_COINS += 100 # Reward for winning PvP
                      save_data()
+            
+            # Send the updated state immediately if changed
+            if game_state in ["GAME_OVER", "VICTORY"] and is_host:
+                  # One last send to notify client
+                  pass # Handled in next loop iteration? No, loop might end.
+                  # Logic is at top of loop. We need to force a send or wait for next frame?
+                  # We are in Update Logic at bottom.
+                  # Loop continues to top?
+                  # "if game_state == PLAYING": next frame it won't trigger.
+                  # So we must send HERE.
+                  try:
+                        state_packet = {
+                            'game_state': game_state,
+                            'p1': {'x': wizard.rect.x, 'y': wizard.rect.y, 'hp': wizard.health, 'face': wizard.facing_right, 'cast': wizard.is_casting},
+                            'p2': {'x': remote_wizard.rect.x, 'y': remote_wizard.rect.y, 'hp': remote_wizard.health, 'face': remote_wizard.facing_right, 'cast': remote_wizard.is_casting} if remote_wizard else None,
+                            'enemies': [], 'projs': [], 'effects': []
+                        }
+                        net.send(state_packet)
+                  except: pass
             
             # Wave Logic... (Keep same)
             
