@@ -79,6 +79,13 @@ is_multiplayer = False
 is_host = False
 remote_wizard = None # The other player (If Host -> P2, If Client -> P1)
 mp_status_msg = ""
+mp_input_ip = "127.0.0.1" # Default IP to join
+try:
+    with open("server_ip.txt", "r") as f:
+        content = f.read().strip()
+        if content: mp_input_ip = content
+except: pass
+mp_input_active = False   # Is user typing IP?
 
 
 SAVE_FILE = "save_game.json"
@@ -836,6 +843,17 @@ while running:
     events = pygame.event.get()
     for e in events:
         if e.type == pygame.QUIT: running = False
+        
+        # Text Input for Multiplayer IP
+        if game_state == "MP_MENU" and e.type == pygame.KEYDOWN:
+            if e.key == pygame.K_BACKSPACE:
+                mp_input_ip = mp_input_ip[:-1]
+            elif e.key == pygame.K_RETURN:
+                pass # Handled by button usually, or trigger connect
+            elif len(mp_input_ip) < 15: # IPv4 max length roughly
+                # Allow numbers and dots
+                if e.unicode in "0123456789.":
+                     mp_input_ip += e.unicode
     
     # State Machine
     if game_state == "MENU":
@@ -946,28 +964,41 @@ while running:
                  net.start_host_nonblocking(bind_ip=chosen_ip)
                  pygame.time.wait(200)
 
+             # IP INPUT BOX (Text Field)
+             ip_label = small_font.render("Enter Server IP:", True, (200, 200, 255))
+             screen.blit(ip_label, (SCREEN_WIDTH//2 - 120, 365))
+             
+             ip_box = pygame.Rect(SCREEN_WIDTH//2 - 120, 390, 240, 40)
+             pygame.draw.rect(screen, (30, 30, 50), ip_box)
+             pygame.draw.rect(screen, (100, 100, 200), ip_box, 2)
+             
+             ip_txt = shop_font.render(mp_input_ip, True, WHITE)
+             screen.blit(ip_txt, (ip_box.x + 10, ip_box.y + 5))
+             
              # JOIN BUTTON
-             join_btn = pygame.Rect(SCREEN_WIDTH//2 - 120, 370, 240, 50)
+             join_btn = pygame.Rect(SCREEN_WIDTH//2 - 120, 440, 240, 50)
              col = (50, 50, 100) if not join_btn.collidepoint(pygame.mouse.get_pos()) else (80, 80, 150)
              pygame.draw.rect(screen, col, join_btn, border_radius=8)
              pygame.draw.rect(screen, WHITE, join_btn, 2, border_radius=8)
              jt = shop_font.render("JOIN GAME", True, WHITE)
              screen.blit(jt, jt.get_rect(center=join_btn.center))
              
-             if join_btn.collidepoint(pygame.mouse.get_pos()) and pygame.mouse.get_pressed()[0]:
-                 # Attempt to join defined IP in text file
-                 target_ip = "127.0.0.1"
-                 try:
-                    with open("server_ip.txt", "r") as f:
-                        target_ip = f.read().strip()
-                 except: pass
-                 
-                 mp_status_msg = f"Connecting to {target_ip}..."
-                 net.connect_to_host(target_ip)
-                 pygame.time.wait(200)
+             click = pygame.mouse.get_pressed()[0]
+             
+             if (join_btn.collidepoint(pygame.mouse.get_pos()) and click) or (pygame.key.get_pressed()[pygame.K_RETURN]):
+                 # Attempt to join mp_input_ip
+                 if mp_input_ip:
+                     mp_status_msg = f"Connecting to {mp_input_ip}..."
+                     try:
+                        with open("server_ip.txt", "w") as f:
+                            f.write(mp_input_ip)
+                     except: pass
+                     
+                     net.connect_to_host(mp_input_ip)
+                     pygame.time.wait(300)
 
              # BACK BUTTON
-             back_btn = pygame.Rect(SCREEN_WIDTH//2 - 120, 500, 240, 50)
+             back_btn = pygame.Rect(SCREEN_WIDTH//2 - 120, 520, 240, 50)
              pygame.draw.rect(screen, (70, 50, 50), back_btn, border_radius=8)
              pygame.draw.rect(screen, WHITE, back_btn, 2, border_radius=8)
              bt = shop_font.render("BACK", True, WHITE)
