@@ -137,7 +137,7 @@ class Network:
             
             if data.get("cmd") == "INVITE":
                 # Received Invitation
-                self.incoming_invite = {"ip": addr[0], "name": data.get("name", "Unknown"), "conn": conn}
+                self.incoming_invite = {"ip": addr[0], "name": data.get("name", "Unknown"), "mode": data.get("mode", "COOP"), "conn": conn}
             elif data.get("cmd") == "ACCEPT_INVITE":
                 # They accepted our invite!
                 # We generated the invite connection, so we are Client side physically, 
@@ -155,13 +155,13 @@ class Network:
         except:
             conn.close()
 
-    def send_invite(self, ip, my_name):
+    def send_invite(self, ip, my_name, game_mode="COOP"):
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((ip, PORT))
             
             # Send Invite Packet
-            msg = {"cmd": "INVITE", "name": my_name}
+            msg = {"cmd": "INVITE", "name": my_name, "mode": game_mode}
             serialized = pickle.dumps(msg)
             s.sendall(struct.pack('!I', len(serialized)) + serialized)
             

@@ -77,6 +77,7 @@ gray = (100, 100, 100) # Defined gray here used in draw_shop
 net = Network()
 is_multiplayer = False
 is_host = False
+mp_game_mode = "COOP" # "COOP" or "PVP"
 remote_wizard = None # The other player (If Host -> P2, If Client -> P1)
 mp_status_msg = ""
 mp_input_ip = "127.0.0.1" # Default IP to join
@@ -997,7 +998,7 @@ while running:
                 if click and net.connection_status == "IDLE":
                     # SEND INVITE
                     mp_status_msg = f"Inviting {data['name']}..."
-                    net.send_invite(ip, "WizardPlayer") # TODO: Custom Name
+                    net.send_invite(ip, "WizardPlayer", mp_game_mode) # TODO: Custom Name
                     pygame.time.wait(200)
 
             pygame.draw.rect(screen, col, p_rect, border_radius=5)
@@ -1044,8 +1045,22 @@ while running:
         if btn_inv.collidepoint(mouse_pos) and click and net.connection_status == "IDLE":
              if mp_input_ip:
                  mp_status_msg = f"Inviting {mp_input_ip}..."
-                 net.send_invite(mp_input_ip, "WizardPlayer")
+                 net.send_invite(mp_input_ip, "WizardPlayer", mp_game_mode)
                  pygame.time.wait(200)
+
+        # Game Mode Selector (Host Only or Global)
+        mode_lbl = small_font.render("Game Mode:", True, GRAY)
+        screen.blit(mode_lbl, (500, 350))
+        
+        mode_rect = pygame.Rect(650, 345, 150, 35)
+        mode_col = GREEN if mp_game_mode == "COOP" else RED
+        pygame.draw.rect(screen, mode_col, mode_rect, border_radius=5)
+        
+        mode_txt_s = shop_font.render(mp_game_mode, True, WHITE)
+        screen.blit(mode_txt_s, mode_txt_s.get_rect(center=mode_rect.center))
+        
+        if click and mode_rect.collidepoint(mouse_pos):
+             mp_game_mode = "PVP" if mp_game_mode == "COOP" else "COOP"
 
         # --- INCOMING INVITE POPUP ---
         if net.incoming_invite:
@@ -1064,7 +1079,7 @@ while running:
             screen.blit(title_inv, title_inv.get_rect(center=(cx, cy - 80)))
             
             from_t = font.render(f"From: {net.incoming_invite['name']}", True, WHITE)
-            ip_t = small_font.render(f"({net.incoming_invite['ip']})", True, GRAY)
+            ip_t = small_font.render(f"({net.incoming_invite['ip']}) - Mode: {net.incoming_invite.get('mode', 'COOP')}", True, GRAY)
             screen.blit(from_t, from_t.get_rect(center=(cx, cy - 20)))
             screen.blit(ip_t, ip_t.get_rect(center=(cx, cy + 20)))
             
@@ -1085,6 +1100,9 @@ while running:
             
             if click:
                 if btn_yes.collidepoint(mouse_pos):
+                    # Set Game Mode from Invite
+                    if net.incoming_invite and "mode" in net.incoming_invite:
+                        mp_game_mode = net.incoming_invite["mode"]
                     net.accept_invite()
                 elif btn_no.collidepoint(mouse_pos):
                     net.decline_invite()
@@ -1162,6 +1180,7 @@ while running:
         if shop_scroll_y < max_scroll_down: shop_scroll_y = max_scroll_down
             
     elif game_state == "PLAYING":
+        boss_active = None
         # --- MULTIPLAYER SYNC ---
         if is_multiplayer:
             if is_host:
@@ -1292,7 +1311,8 @@ while running:
                         
             # Projectiles
             # Spawning
-            if spawn_timer <= 0:
+            # Spawning (COOP ONLY)
+            if spawn_timer <= 0 and mp_game_mode == "COOP":
                 spawn_enemy_logic()
                 spawn_timer = 120 - (current_wave * 2) 
                 if spawn_timer < 40: spawn_timer = 40
@@ -1315,6 +1335,26 @@ while running:
             for p in projectiles:
                 if p.rect.left > SCREEN_WIDTH + 200 or p.rect.right < -200 or p.rect.bottom < -200 or p.rect.top > SCREEN_HEIGHT + 200:
                     p.kill()
+
+            # PvP Collision Checks
+            if is_multiplayer and mp_game_mode == "PVP":
+                 # Check if any projectile hits any player
+                 # Host Wizard
+                 hits_p1 = pygame.sprite.spritecollide(wizard, projectiles, True)
+                 if hits_p1:
+                     damage = sum(p.damage for p in hits_p1)
+                     wizard.health -= damage
+                     for _ in range(5):
+                        particles.append({'x': wizard.rect.centerx, 'y': wizard.rect.centery, 'life': 10, 'max_life': 10, 'size': 4, 'color': (255, 50, 50)})
+                 
+                 # Remote Wizard (P2)
+                 if remote_wizard:
+                     hits_p2 = pygame.sprite.spritecollide(remote_wizard, projectiles, True)
+                     if hits_p2:
+                         damage = sum(p.damage for p in hits_p2)
+                         remote_wizard.health -= damage
+                         for _ in range(5):
+                            particles.append({'x': remote_wizard.rect.centerx, 'y': remote_wizard.rect.centery, 'life': 10, 'max_life': 10, 'size': 4, 'color': (255, 50, 50)})
 
             # Enemy Projectile Collisions
             # Check collisions for BOTH players if multiplayer
@@ -1392,6 +1432,14 @@ while running:
                     kill_enemy(enemy)
             
             enemy_projectiles.empty()
+
+
+        # Ensure boss_active is set (for Client mainly)
+        if boss_active is None:
+             for e in enemies:
+                 if e.enemy_type in ["OGRE_KING", "DRAGON_BOSS"]:
+                     boss_active = e
+                     break
 
         # 2. Drawing
         draw_background_scenery(screen, current_biome, SCREEN_WIDTH, SCREEN_HEIGHT)
