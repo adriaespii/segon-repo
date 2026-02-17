@@ -16,9 +16,11 @@ class UDPDiscovery:
         self.broadcast_sock = None
         self.listen_sock = None
         self.lock = threading.Lock()
+        self.bind_ip = "0.0.0.0"
 
-    def start(self):
+    def start(self, bind_ip="0.0.0.0"):
         self.running = True
+        self.bind_ip = bind_ip
         
         # Broadcast Socket
         self.broadcast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -28,7 +30,7 @@ class UDPDiscovery:
         self.listen_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.listen_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
-            self.listen_sock.bind(("", UDP_PORT))
+            self.listen_sock.bind((self.bind_ip, UDP_PORT))
         except:
             print("UDP Bind Failed")
             
@@ -82,9 +84,21 @@ class Network:
         # Invite System
         self.incoming_invite = None # {ip: ..., name: ...}
         self.lock = threading.Lock()
-        
-    def start_discovery(self):
-        self.discovery.start()
+        self.bind_ip = "0.0.0.0"
+    
+    def get_local_interfaces(self):
+        """Returns a list of local IP addresses."""
+        try:
+            hostname = socket.gethostname()
+            ips = socket.gethostbyname_ex(hostname)[2]
+            if not ips: return ["127.0.0.1"]
+            return ips
+        except:
+            return ["127.0.0.1"]
+
+    def start_discovery(self, bind_ip="0.0.0.0"):
+        self.bind_ip = bind_ip
+        self.discovery.start(bind_ip)
         # Also start listening for TCP Setup
         self._start_tcp_listener()
         
@@ -98,7 +112,7 @@ class Network:
         try:
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.server_socket.bind(("0.0.0.0", PORT))
+            self.server_socket.bind((self.bind_ip, PORT))
             self.server_socket.listen(5)
             threading.Thread(target=self._accept_loop, daemon=True).start()
         except Exception as e:

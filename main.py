@@ -80,6 +80,8 @@ is_host = False
 remote_wizard = None # The other player (If Host -> P2, If Client -> P1)
 mp_status_msg = ""
 mp_input_ip = "127.0.0.1" # Default IP to join
+mp_interfaces = []
+mp_selected_interface_idx = 0
 try:
     with open("server_ip.txt", "r") as f:
         content = f.read().strip()
@@ -861,7 +863,7 @@ while running:
         
         # Logic for buttons (must match draw_menu rects)
         ui_center_x = int(SCREEN_WIDTH * 0.7)
-        start_y = 250
+        start_y = 220
         btn_w, btn_h = 280, 55
         spacing = 15
         
@@ -883,25 +885,21 @@ while running:
         if rect_inf.collidepoint(mouse_pos) and click:
             reset_run(mode="INFINITE")
             
-        # 2: SHOP
-        rect_shop = pygame.Rect(ui_center_x - btn_w//2, start_y + 2*(btn_h + spacing), btn_w, btn_h)
-        if rect_shop.collidepoint(mouse_pos) and click:
-            shop_return_target = "MENU"
-            game_state = "SHOP"
-            
-        # 3: EXIT
-        # 3: MULTIPLAYER
+        # 2: MULTIPLAYER
         rect_multi = pygame.Rect(ui_center_x - btn_w//2, start_y + 2*(btn_h + spacing), btn_w, btn_h)
         if rect_multi.collidepoint(mouse_pos) and click:
+            mp_interfaces = net.get_local_interfaces() 
+            mp_selected_interface_idx = 0
+            mp_status_msg = "Select Network Interface"
             game_state = "MP_MENU"
             
-        # 4: SHOP
+        # 3: SHOP
         rect_shop = pygame.Rect(ui_center_x - btn_w//2, start_y + 3*(btn_h + spacing), btn_w, btn_h)
         if rect_shop.collidepoint(mouse_pos) and click:
             shop_return_target = "MENU"
             game_state = "SHOP"
             
-        # 5: EXIT
+        # 4: EXIT
         rect_exit = pygame.Rect(ui_center_x - btn_w//2, start_y + 4*(btn_h + spacing), btn_w, btn_h)
         if rect_exit.collidepoint(mouse_pos) and click:
             running = False
@@ -917,7 +915,7 @@ while running:
             # Initial Setup for MP Menu
             mp_interfaces = net.get_local_interfaces() 
             mp_selected_interface_idx = 0
-            mp_status_msg = "Select Network Interface to Host/Join"
+            mp_status_msg = "Select Network Interface"
             game_state = "MP_MENU"
         if keys[pygame.K_s]:
             shop_return_target = "MENU"
@@ -930,9 +928,51 @@ while running:
         title = font.render("MULTIPLAYER LOBBY", True, CYAN)
         screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 30))
         
+        # --- INTERFACE SELECTION ---
+        if not mp_interfaces:
+            mp_interfaces = net.get_local_interfaces()
+            
+        int_lbl = small_font.render("Network Interface (Card):", True, GRAY)
+        screen.blit(int_lbl, (50, 70))
+        
+        int_box = pygame.Rect(260, 65, 300, 30)
+        pygame.draw.rect(screen, (40, 40, 60), int_box, border_radius=5)
+        pygame.draw.rect(screen, WHITE, int_box, 1, border_radius=5)
+        
+        current_ip = mp_interfaces[mp_selected_interface_idx] if mp_interfaces else "None"
+        ip_t = small_font.render(current_ip, True, WHITE)
+        screen.blit(ip_t, (270, 68))
+        
+        # Cycle buttons
+        btn_prev = pygame.Rect(230, 65, 25, 30)
+        btn_next = pygame.Rect(565, 65, 25, 30)
+        
+        pygame.draw.rect(screen, (60, 60, 80), btn_prev, border_radius=3)
+        pygame.draw.rect(screen, (60, 60, 80), btn_next, border_radius=3)
+        screen.blit(small_font.render("<", True, WHITE), (237, 68))
+        screen.blit(small_font.render(">", True, WHITE), (572, 68))
+        
+        mouse_pos = pygame.mouse.get_pos()
+        click = False
+        for e in events:
+            if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+                click = True
+        
+        if click:
+            if btn_prev.collidepoint(mouse_pos):
+                mp_selected_interface_idx = (mp_selected_interface_idx - 1) % len(mp_interfaces)
+                if net.discovery.running: 
+                    net.stop()
+                    net.start_discovery(mp_interfaces[mp_selected_interface_idx])
+            elif btn_next.collidepoint(mouse_pos):
+                mp_selected_interface_idx = (mp_selected_interface_idx + 1) % len(mp_interfaces)
+                if net.discovery.running:
+                    net.stop()
+                    net.start_discovery(mp_interfaces[mp_selected_interface_idx])
+
         # Start Discovery if not started
-        if not net.discovery.running:
-            net.start_discovery()
+        if not net.discovery.running and mp_interfaces:
+            net.start_discovery(mp_interfaces[mp_selected_interface_idx])
             
         # --- LEFT PANEL: DISCOVERED PLAYERS ---
         panel_rect = pygame.Rect(50, 100, 400, 400)
@@ -943,8 +983,6 @@ while running:
         screen.blit(lbl, (60, 110))
         
         peers = net.discovery.get_peers()
-        mouse_pos = pygame.mouse.get_pos()
-        click = pygame.mouse.get_pressed()[0]
         
         y_off = 150
         if not peers:
