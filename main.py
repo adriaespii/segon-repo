@@ -176,18 +176,23 @@ def gain_xp(amount):
         save_data()
 # (Effects are now imported from src.assets)
 
-def cast_lightning():
+def cast_lightning(caster):
     # Chain Lightning: Zap closest, then zap from that to next closest
+    if not enemies and mp_game_mode != "PVP": return
+    
+    # In PvP we might want to target the other player? 
+    # For now, let's keep it simple: Lightning only targets enemies for now to avoid complexity in this step
+    # Or strict Auto-Aim at enemies.
     if not enemies: return
     
     # Find up to 3 targets
     targets = []
     
-    # 1. Closest to Wizard
-    sorted_enemies = sorted(enemies, key=lambda e: math.hypot(e.rect.centerx - wizard.rect.centerx, e.rect.centery - wizard.rect.centery))
+    # 1. Closest to Caster
+    sorted_enemies = sorted(enemies, key=lambda e: math.hypot(e.rect.centerx - caster.rect.centerx, e.rect.centery - caster.rect.centery))
     if sorted_enemies:
         t1 = sorted_enemies[0]
-        if math.hypot(t1.rect.centerx - wizard.rect.centerx, t1.rect.centery - wizard.rect.centery) < 700:
+        if math.hypot(t1.rect.centerx - caster.rect.centerx, t1.rect.centery - caster.rect.centery) < 700:
             targets.append(t1)
             
             # 2. Closest to T1 (excluding T1)
@@ -205,7 +210,7 @@ def cast_lightning():
                             targets.append(t3)
 
     # Apply Damage & Visuals
-    prev_pos = wizard.rect.center
+    prev_pos = caster.rect.center
     for t in targets:
         t.health -= 5 # High damage
         
@@ -221,7 +226,7 @@ def cast_lightning():
         if t.health <= 0:
             kill_enemy(t)
 
-def cast_tornado():
+def cast_tornado(caster):
     # Spawn 2 localized tornado objects that move outward
     # We need to track them in active_effects and handle collision logic THERE,
     # because they need to move over time.
@@ -229,21 +234,23 @@ def cast_tornado():
     # Left Tornado
     active_effects.append({
         "type": "TORNADO_MOVING", 
-        "x": wizard.rect.centerx - 50, 
-        "y": wizard.rect.centery, 
+        "x": caster.rect.centerx - 50, 
+        "y": caster.rect.centery, 
         "life": 100, 
-        "dir": -1
+        "dir": -1,
+        "owner_id": caster.owner_id
     })
     # Right Tornado
     active_effects.append({
         "type": "TORNADO_MOVING", 
-        "x": wizard.rect.centerx + 50, 
-        "y": wizard.rect.centery, 
+        "x": caster.rect.centerx + 50, 
+        "y": caster.rect.centery, 
         "life": 100, 
-        "dir": 1
+        "dir": 1,
+        "owner_id": caster.owner_id
     })
 
-def cast_dragon():
+def cast_dragon(caster):
     # Kill all enemies on screen
     for e in enemies:
         e.health = 0
@@ -1260,13 +1267,13 @@ while running:
                 # BUT wait, Host (P1) vs Client (P1)
                 # In reset_run, we default create Wizard.
                 # We need to override it here.
-                wizard = Wizard(100, SCREEN_HEIGHT - 50, my_c)
+                wizard = Wizard(100, SCREEN_HEIGHT - 50, my_c, owner_id=1)
                 all_sprites.empty()
                 projectiles.empty()
                 enemies.empty()
                 all_sprites.add(wizard)
                 
-                remote_wizard = Wizard(100, SCREEN_HEIGHT - 50, remote_c)
+                remote_wizard = Wizard(100, SCREEN_HEIGHT - 50, remote_c, owner_id=2)
                 remote_wizard.rect.x = 200 # Spawn slightly apart
                 all_sprites.add(remote_wizard)
         
@@ -1280,13 +1287,13 @@ while running:
             my_c = WIZARD_CLASSES[mp_my_class_idx]["color"]
             remote_c = WIZARD_CLASSES[mp_remote_class_idx]["color"]
             
-            wizard = Wizard(100, SCREEN_HEIGHT - 50, my_c)
+            wizard = Wizard(100, SCREEN_HEIGHT - 50, my_c, owner_id=1)
             all_sprites.empty()
             projectiles.empty()
             enemies.empty()
             all_sprites.add(wizard)
             
-            remote_wizard = Wizard(100, SCREEN_HEIGHT - 50, remote_c)
+            remote_wizard = Wizard(100, SCREEN_HEIGHT - 50, remote_c, owner_id=2)
             remote_wizard.rect.x = 200
             all_sprites.add(remote_wizard)
             
@@ -1347,6 +1354,26 @@ while running:
                         
                         if remote_keys:
                              remote_wizard.update(remote_keys, [])
+                             
+                             # Identify if remote wizard triggers abilities
+                             # Client doesn't have cooldowns for abilities in `wizard` object? 
+                             # Wait, simple protocol: Client sends keys. Host checks cooldowns on `remote_wizard`.
+                             # We need cooldowns on Wizard class instances! (They are there)
+                             
+                             # Check Remote Abilities
+                             # TORNADO
+                             if remote_keys[pygame.K_t] and remote_wizard.cast_cooldown <= 0: # Using cast_cooldown for generic or specific?
+                                 # We need specific cooldown tracking for P2.
+                                 # Simplification: Use same global cooldowns? NO.
+                                 # Wizard class has `cast_cooldown` for basic attack. 
+                                 # We need skill cooldowns ON THE WIZARD INSTANCE. Default code had globals.
+                                 # Refactoring to instance variables is best, but for now let's hack it or stick to basics.
+                                 pass 
+
+                             # HEAL (H)
+                             if remote_keys[pygame.K_h]:
+                                 remote_wizard.cast_heal()  # Inside wizard class, no cooldown check yet other than health cap?
+                                 # Add visual?
                         
                         if remote_click and remote_mouse:
                              projs = remote_wizard.shoot(target_pos=remote_mouse)
@@ -1363,7 +1390,8 @@ while running:
                             'face': remote_wizard.facing_right, 'cast': remote_wizard.is_casting
                         } if remote_wizard else None,
                         'enemies': [{'x': e.rect.x, 'y': e.rect.y, 'type': e.enemy_type} for e in enemies],
-                        'projs': [{'x': p.rect.x, 'y': p.rect.y, 'c': p.color, 't': p.type} for p in projectiles]
+                        'projs': [{'x': p.rect.x, 'y': p.rect.y, 'c': p.color, 't': p.type} for p in projectiles],
+                        'effects': active_effects # serialized active effects
                     }
                     net.send(state)
                     
@@ -1405,6 +1433,11 @@ while running:
                     for pd in state.get('projs', []):
                          p = Projectile(pd['x'], pd['y'], True, pd['c'], pd['t'])
                          projectiles.add(p)
+                         
+                    # Sync Effects
+                    # active_effects[:] ensures we update the global list in-place
+                    if 'effects' in state:
+                        active_effects[:] = state['effects']
                         
                 # 3. SKIP LOGIC
                 # Draw and continue
@@ -1430,14 +1463,20 @@ while running:
                 if projs: 
                     projectiles.add(projs)
                     all_sprites.add(projs)
-
+            
+            # Heal Input (H)
+            if keys[pygame.K_h]:
+                if wizard.cast_heal():
+                    # Visual Feedback
+                    particles.append({'x': wizard.rect.centerx, 'y': wizard.rect.centery, 'life': 20, 'max_life': 20, 'size': 10, 'color': GREEN})
+                    
             # Ability Inputs
             if UNLOCKED_ABILITIES["TORNADO"] and keys[pygame.K_t] and tornado_cooldown == 0:
-                cast_tornado()
+                cast_tornado(wizard) # Pass Caster
                 tornado_cooldown = 300 
                 
             if UNLOCKED_ABILITIES["DRAGON"] and keys[pygame.K_r] and dragon_cooldown == 0:
-                cast_dragon()
+                cast_dragon(wizard)
                 dragon_cooldown = 1800 
             
             if tornado_cooldown > 0: tornado_cooldown -= 1
@@ -1446,7 +1485,7 @@ while running:
             # Auto Lightning
             if UNLOCKED_ABILITIES["LIGHTNING"]:
                 if lightning_timer <= 0:
-                    cast_lightning()
+                    cast_lightning(wizard)
                     lightning_timer = 120 
                 lightning_timer -= 1
                 
@@ -1485,25 +1524,27 @@ while running:
                 if p.rect.left > SCREEN_WIDTH + 200 or p.rect.right < -200 or p.rect.bottom < -200 or p.rect.top > SCREEN_HEIGHT + 200:
                     p.kill()
 
-            # PvP Collision Checks
+             # PvP Collision Checks
             if is_multiplayer and mp_game_mode == "PVP":
                  # Check if any projectile hits any player
                  # Host Wizard
-                 hits_p1 = pygame.sprite.spritecollide(wizard, projectiles, True)
-                 if hits_p1:
-                     damage = sum(p.damage for p in hits_p1)
-                     wizard.health -= damage
-                     for _ in range(5):
-                        particles.append({'x': wizard.rect.centerx, 'y': wizard.rect.centery, 'life': 10, 'max_life': 10, 'size': 4, 'color': (255, 50, 50)})
+                 hits_p1 = pygame.sprite.spritecollide(wizard, projectiles, False) # Don't kill yet, check owner
+                 for p in hits_p1:
+                     if p.owner_id != wizard.owner_id: # Only take damage from enemy
+                         wizard.health -= p.damage
+                         p.kill()
+                         for _ in range(5):
+                            particles.append({'x': wizard.rect.centerx, 'y': wizard.rect.centery, 'life': 10, 'max_life': 10, 'size': 4, 'color': (255, 50, 50)})
                  
                  # Remote Wizard (P2)
                  if remote_wizard:
-                     hits_p2 = pygame.sprite.spritecollide(remote_wizard, projectiles, True)
-                     if hits_p2:
-                         damage = sum(p.damage for p in hits_p2)
-                         remote_wizard.health -= damage
-                         for _ in range(5):
-                            particles.append({'x': remote_wizard.rect.centerx, 'y': remote_wizard.rect.centery, 'life': 10, 'max_life': 10, 'size': 4, 'color': (255, 50, 50)})
+                     hits_p2 = pygame.sprite.spritecollide(remote_wizard, projectiles, False)
+                     for p in hits_p2:
+                         if p.owner_id != remote_wizard.owner_id:
+                             remote_wizard.health -= p.damage
+                             p.kill()
+                             for _ in range(5):
+                                particles.append({'x': remote_wizard.rect.centerx, 'y': remote_wizard.rect.centery, 'life': 10, 'max_life': 10, 'size': 4, 'color': (255, 50, 50)})
 
             # Enemy Projectile Collisions
             # Check collisions for BOTH players if multiplayer
@@ -1677,6 +1718,22 @@ while running:
                         if eff["life"] % 5 == 0:
                             e.health -= 1
                             if e.health <= 0: kill_enemy(e)
+                            
+                # PvP Collision (Tornado vs Players)
+                if is_multiplayer and mp_game_mode == "PVP" and eff["life"] % 5 == 0:
+                    # Check Wizard (P1)
+                    if t_rect.colliderect(wizard.rect):
+                        if eff.get("owner_id") != wizard.owner_id:
+                            wizard.health -= 5 # Tornado damage
+                            # Visual hit
+                            particles.append({'x': wizard.rect.centerx, 'y': wizard.rect.centery, 'life': 5, 'max_life': 5, 'size': 5, 'color': RED})
+                            
+                    # Check Remote Wizard (P2)
+                    if remote_wizard and t_rect.colliderect(remote_wizard.rect):
+                        if eff.get("owner_id") != remote_wizard.owner_id:
+                            remote_wizard.health -= 5
+                            # Visual hit
+                            particles.append({'x': remote_wizard.rect.centerx, 'y': remote_wizard.rect.centery, 'life': 5, 'max_life': 5, 'size': 5, 'color': RED})
                             
             elif eff["type"] == "DRAGON":
                 draw_dragon_effect(screen, eff["x"], eff["y"], eff["life"])

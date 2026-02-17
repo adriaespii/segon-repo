@@ -43,7 +43,7 @@ PROJECTILE_SPEED = 12
 OGRE_SPEED = 3
 
 # Game Stats
-PLAYER_MAX_HEALTH = 100
+PLAYER_MAX_HEALTH = 1000
 BASE_WAND_DAMAGE = 20 # High enough to kill weak enemies in 1 hit
 OGRE_HEALTH_BASE = 20 # 1 hit for Ogre initially
 GOBLIN_HEALTH_BASE = 10 # 1 hit always initially

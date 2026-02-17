@@ -6,13 +6,14 @@ from src.config import *
 from src.assets import *
 
 class Wizard(pygame.sprite.Sprite):
-    def __init__(self, x, y, color=(0, 255, 255)): # Default Cyan
+    def __init__(self, x, y, color=(0, 255, 255), owner_id=1): # Default Cyan
         super().__init__()
         self.image = pygame.Surface((PLAYER_SIZE, PLAYER_SIZE), pygame.SRCALPHA)
         self.image.fill((0, 0, 0, 0)) # Transparent
         self.rect = self.image.get_rect()
         self.rect.midbottom = (x, y)
         self.color = color
+        self.owner_id = owner_id
         self.vel_y = 0
         self.vel_x = 0
         self.facing_right = True
@@ -131,6 +132,19 @@ class Wizard(pygame.sprite.Sprite):
         # 2: ARCANE VOLLEY
         # 3: VOID LANCE
         # 4: FIRE RING
+        # 5: HEAL (New)
+        
+        target_wep = "DEFAULT"
+        if slot_index == 1: target_wep = "DEFAULT"
+        elif slot_index == 2: target_wep = "ARCANE_VOLLEY"
+        elif slot_index == 3: target_wep = "VOID_LANCE"
+        elif slot_index == 4: target_wep = "FIRE_RING"
+        elif slot_index == 5:
+             # Instant Heal, not a weapon switch? 
+             # Or switch to "HEAL_WAND"?
+             # Let's just trigger heal immediately? No, select_weapon is for selecting.
+             # Let's make it a castable action separately.
+             return False
         
         target_wep = "DEFAULT"
         if slot_index == 1: target_wep = "DEFAULT"
@@ -175,7 +189,7 @@ class Wizard(pygame.sprite.Sprite):
             
             # Common Projectile Velocity function
             def create_proj(speed, angle, p_type, col):
-                p = Projectile(start_x, start_y_base, 1 if math.cos(angle)>0 else -1, col, p_type)
+                p = Projectile(start_x, start_y_base, 1 if math.cos(angle)>0 else -1, col, p_type, owner_id=self.owner_id)
                 p.vel_x = math.cos(angle) * speed
                 p.vel_y = math.sin(angle) * speed
                 return p
@@ -221,7 +235,17 @@ class Wizard(pygame.sprite.Sprite):
                  projectiles.append(p)
 
             return projectiles
+            return projectiles
         return []
+
+    def cast_heal(self):
+        # 30% Heal logic
+        heal_amt = self.max_health * 0.3
+        if self.health < self.max_health:
+             self.health += heal_amt
+             if self.health > self.max_health: self.health = self.max_health
+             return True
+        return False
 
 class EnemyProjectile(pygame.sprite.Sprite):
     def __init__(self, x, y, target_x, target_y, is_boss=False, p_type="DEFAULT"):
@@ -581,10 +605,11 @@ class DragonBoss(Enemy):
         return new_projectile_list
 
 class Projectile(pygame.sprite.Sprite):
-    def __init__(self, x, y, facing_right, color=WHITE, type="DEFAULT"):
+    def __init__(self, x, y, facing_right, color=WHITE, type="DEFAULT", owner_id=0):
         super().__init__()
         self.color = color
         self.type = type
+        self.owner_id = owner_id
         self.damage = BASE_WAND_DAMAGE
         self.piercing = 0
         self.hit_list = [] 
